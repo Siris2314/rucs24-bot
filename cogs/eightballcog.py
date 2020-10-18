@@ -7,7 +7,7 @@ class EightBall(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(aliases=["8Ball", "test"])
+    @commands.command(aliases=["8Ball", "Random8"])
     async def _8Ball(self, ctx, *, question):
         responses = [
             "It is certain.",
