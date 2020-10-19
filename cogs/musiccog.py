@@ -5,9 +5,10 @@ from discord.utils import get
 import youtube_dl
 
 
-class music_system(commands.Cog):
+class MusicCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
 
     @commands.command(pass_context=True, aliases=["J", "jo"])
     async def join(self, ctx):
@@ -17,20 +18,19 @@ class music_system(commands.Cog):
 
         if voice and voice.is_connected():
             await voice.move_to(channel)
-
         else:
             voice = await channel.connect()
-
+            
+        # Work around for currently existing issue wherein
+        # music will not play upon first connection
         await voice.disconnect()
 
         if voice and voice.is_connected():
             await voice.move_to(channel)
-
         else:
             voice = await channel.connect()
             print(f"The bot has connected to {channel}\n")
-
-        await ctx.send(f"Joined {channel}")
+            
 
     @commands.command(pass_context=True, aliases=["L", "le"])
     async def leave(self, ctx):
@@ -39,28 +39,23 @@ class music_system(commands.Cog):
 
         if voice and voice.is_connected():
             await voice.disconnect()
-            print(f"The bot has left {channel}")
-            await ctx.send(f"Disconnected from {channel}")
-
         else:
-            print("Bot was told to leave voice channel, yet was not in one")
-            await ctx.send("Not in a current voice channel")
+            await ctx.send("Error: no voice channel to leave")
+
 
     @commands.command(pass_context=True, aliases=["p", "pl"])
     async def play(self, ctx, url: str):
-        song_there = os.path.isfile("song.mp3")
+        song_there = os.path.isfile("./data/song.mp3")
         try:
             if song_there:
-                os.remove("song.mp3")
+                os.remove("./data/song.mp3")
                 print("Removed old song file")
 
         except PermissionError:
-            print("Trying to remove song file but it is being played")
-            await ctx.send("Error")
+            print("Error: unable to remove old song file. Do you have permission to do this?")
+            await ctx.send("Permission error. Please contact an administrator.")
             return
-
-        await ctx.send("Ready Time")
-
+        
         voice = get(self.bot.voice_clients, guild=ctx.guild)
 
         ydl_opts = {
@@ -70,42 +65,37 @@ class music_system(commands.Cog):
                     "key": "FFmpegExtractAudio",
                     "preferredcodec": "mp3",
                     "preferredquality": "192",
-                }
+                },
+            "outtmpl": "./data/%(title)s.%(ext)s"
             ],
         }
 
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             print("Downloading Audio\n")
-
             ydl.download([url])
 
-        for file in os.listdir("./"):
+        for file in os.listdir("./data/"):
             if file.endswith("mp3"):
-                name = file
-                print(f"Renamed File: {file}\n")
+                name, *_ = file.split(".")
                 os.rename(file, "song.mp3")
 
         voice.play(
-            discord.FFmpegPCMAudio("song.mp3"),
-            after=lambda e: print(f"{name} has finished playing"),
+            discord.FFmpegPCMAudio("song.mp3")
         )
         voice.source = discord.PCVolumeTransformer(voice.source)
         voice.source.volume = 0.07
 
-        nname = name.rsplit("-", 2)
-        await ctx.send(f"Playing: {nname}")
-        print("Playing")
-
+        await ctx.send(f"Playing: {name}")
+        
+        
     @commands.command(pass_context=True, aliases=["pa", "pau"])
     async def pause(self, ctx):
         voice = get(self.bot.voice_clients, guild=ctx.guild)
 
         if voice and voice.is_playing():
-            print("Music Puase")
             voice.pause()
             await ctx.send("Music Paused")
         else:
-            print("No Audio Playing")
             await ctx.send("Music is not playing, pause failure")
 
     @commands.command(pass_context=True, aliases=["re", "resum"])
@@ -113,24 +103,20 @@ class music_system(commands.Cog):
         voice = get(self.bot.voice_clients, guild=ctx.guild)
 
         if voice and voice.is_paused():
-            print("Music Resume")
             voice.resume()
             await ctx.send("Music Resumed")
         else:
-            print("No Audio Playing")
             await ctx.send("Music is not playing, resume failure")
 
     @commands.command(pass_context=True, aliases=["st", "stp"])
     async def stop(self, ctx):
         voice = get(self.bot.voice_clients, guild=ctx.guild)
         if voice and voice.is_playing():
-            print("Music Stopped")
             voice.stop()
             await ctx.send("Music Stopped")
         else:
-            print("No Audio Playing")
             await ctx.send("Music is not playing, stop failure")
 
 
 def setup(bot):
-    bot.add_cog(music_system(bot))
+    bot.add_cog(MusicCog(bot))
